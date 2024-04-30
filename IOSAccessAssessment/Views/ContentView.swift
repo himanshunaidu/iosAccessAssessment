@@ -284,6 +284,9 @@ class SegmentationViewController: UIViewController, AVCaptureVideoDataOutputSamp
             self.masker.grayscaleValues = [grayscaleValue]
             self.masker.colorValues = [singleColor]
             self.segmentationView.image = UIImage(ciImage: self.masker.outputImage!, scale: 1.0, orientation: .downMirrored)
+//            guard let image = self.segmentationView.image?.cgImage else {
+//                print("It doesn't have cgImage")
+//                return }
             DispatchQueue.main.async {
                 self.sharedImageData?.objectSegmentation = UIImage(ciImage: self.masker.outputImage!, scale: 1.0, orientation: .downMirrored)
             }

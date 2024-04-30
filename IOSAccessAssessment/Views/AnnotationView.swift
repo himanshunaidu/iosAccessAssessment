@@ -11,9 +11,17 @@ struct AnnotationView: View {
     @State private var index = 0
     @State private var selectedIndex: Int? = nil
     @State private var isShowingCameraView = false
+    private var objectLocation = ObjectLocation()
     var selection: [Int]
     var classes: [String]
     let options = ["I agree with this class annotation", "Annotation is missing some instances of the class", "The class annotation is misidentified"]
+    
+    // Adding an initializer with internal access level
+    init(sharedImageData: SharedImageData, selection: [Int], classes: [String]) {
+        self.sharedImageData = sharedImageData
+        self.selection = selection
+        self.classes = classes
+    }
     
     var body: some View {
         if (isShowingCameraView == true || index >= selection.count) {
@@ -60,6 +68,7 @@ struct AnnotationView: View {
                     }
                     
                     Button(action: {
+                        objectLocation.loadImage(with: sharedImageData.objectSegmentation!)
                         self.nextSegment()
                         selectedIndex = nil
                     }) {
@@ -84,8 +93,7 @@ struct AnnotationView: View {
     }
     
     func nextSegment() {
-//        print("A")
-        print(index)
+//        print(index)
         index += 1
         if index >= (selection.count) {
             // Handle completion, save responses, or navigate to the next screen
@@ -153,112 +161,3 @@ struct HostedAnnotationCameraViewController: UIViewControllerRepresentable{
     func updateUIViewController(_ uiView: AnnotationCameraViewController, context: Context) {
     }
 }
-
-//struct AnnotationView: View {
-//    @State private var index = 0
-//    @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
-//    @State private var selectedIndex: Int? = nil
-//    @State private var responses = [Int]()
-//    let options = ["I agree with this class annotation", "Annotation is missing some instances of the class", "The class annotation is misidentified"]
-//    @State private var isShowingCameraView = false
-//
-//    var capImage: UIImage
-//    var capSeg: UIImage
-//    var classes: [String]
-//    var selection: [Int]
-//
-//    var body: some View {
-//        if (isShowingCameraView == true) {
-//            CameraView(selection: Array(selection), classes: classes)
-//        } else {
-//            ZStack {
-//                VStack {
-//                    HStack {
-//                        Spacer()
-//                        Image(uiImage: capImage)
-//                            .resizable()
-//                            .aspectRatio(contentMode: .fit)
-//                            .frame(width: 200, height: 200)
-//                        Spacer()
-//                    }
-//
-//                    HStack {
-//                        Spacer()
-//                        Text("Selected class: \(classes[selection[index]])")
-//                        Spacer()
-//                    }
-//
-//                    ProgressBar(value: calculateProgress(), total: selection.count)
-//
-//                    HStack {
-//                        Spacer()
-//                        VStack {
-//                            ForEach(0..<options.count) { index in
-//                                Button(action: {
-//                                    // Toggle selection
-//                                    if selectedIndex == index {
-//                                        selectedIndex = nil
-//                                    } else {
-//                                        selectedIndex = index
-//                                    }
-//                                }) {
-//                                    Text(options[index])
-//                                        .padding()
-//                                        .foregroundColor(selectedIndex == index ? .red : .blue) // Change color based on selection
-//                                }
-//                            }
-//                        }
-//                        Spacer()
-//                    }
-//
-//                    Button(action: {
-//                        self.nextSegment()
-//                        selectedIndex = nil
-//                    }) {
-//                        Text("Next")
-//                    }
-//                    .padding()
-//                }
-//            }
-//            .navigationBarTitle("Annotation View", displayMode: .inline)
-//            .navigationBarBackButtonHidden(true)
-//            .navigationBarItems(leading: Button(action: {
-//                // This action depends on how you manage navigation
-//                // For demonstration, this simply dismisses the view, but you need a different mechanism to navigate to CameraView
-//                self.isShowingCameraView = true;
-//            }) {
-//                Image(systemName: "chevron.left")
-//                    .foregroundColor(.blue)
-//                Text("Camera View")
-//            })
-//
-//        }
-//
-//    }
-//
-//    func selectOption(option: Int) {
-//        responses.append(option)
-//    }
-//
-//    func nextSegment() {
-//        index += 1
-//        if index >= selection.count {
-//            // Handle completion, save responses, or navigate to the next screen
-//        }
-//    }
-//
-//    func calculateProgress() -> Float {
-//        return Float(index + 1) / Float(selection.count)
-//    }
-//}
-//
-//struct ProgressBar: View {
-//    var value: Float
-//    var total: Int
-//
-//    var body: some View {
-//        ProgressView(value: value, total: Float(total))
-//            .progressViewStyle(LinearProgressViewStyle())
-//            .padding()
-//    }
-//}
