@@ -82,10 +82,11 @@ struct ContentView: View {
     @StateObject private var sharedImageData = SharedImageData()
     @State private var manager: CameraManager?
     @State private var navigateToAnnotationView = false
+    var objectLocation = ObjectLocation()
     
     var body: some View {
         if (navigateToAnnotationView) {
-            AnnotationView(sharedImageData: sharedImageData, selection: Array(selection), classes: classes)
+            AnnotationView(sharedImageData: sharedImageData, selection: Array(selection), classes: classes, objectLocation: objectLocation)
         } else {
             VStack {
                 if manager?.dataAvailable ?? false{
@@ -95,11 +96,12 @@ struct ContentView: View {
                     }
                     
                     NavigationLink(
-                        destination: AnnotationView(sharedImageData: sharedImageData, selection: Array(selection), classes: classes),
+                        destination: AnnotationView(sharedImageData: sharedImageData, selection: Array(selection), classes: classes, objectLocation: objectLocation),
                         isActive: $navigateToAnnotationView
                     ) {
                         Button {
                             annotationView = true
+                            objectLocation.settingLocation()
                             manager!.startPhotoCapture()
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                                 navigateToAnnotationView = true
@@ -149,9 +151,11 @@ struct SpinnerView: View {
 
 class SharedImageData: ObservableObject {
     @Published var cameraImage: UIImage?
-    @Published var objectSegmentation: UIImage?
+    @Published var objectSegmentation: CIImage?
     @Published var segmentationImage: UIImage?
     @Published var pixelBuffer: CIImage?
+    @Published var depthData: CVPixelBuffer?
+    @Published var depthDataImage: UIImage?
 }
 
 class CameraViewController: UIViewController {
@@ -178,15 +182,7 @@ class CameraViewController: UIViewController {
     private func setUp(session: AVCaptureSession) {
         previewLayer = AVCaptureVideoPreviewLayer(session: session)
         previewLayer.videoGravity = AVLayerVideoGravity.resizeAspectFill
-        previewLayer.frame = CGRect(x: 0.0, y: 0.0, width: 393.0, height: 325.0)
-//        previewLayer.borderWidth = 2.0
-//        previewLayer.borderColor = UIColor.blue.cgColor
-//
-//        detectionView = UIImageView()
-//        detectionView.frame = CGRect(x: 59, y: 366, width: 280, height: 280)
-//        detectionView.transform = CGAffineTransform(rotationAngle: -.pi / 2)
-//        detectionView.layer.borderWidth = 2.0
-//        detectionView.layer.borderColor = UIColor.blue.cgColor
+        previewLayer.frame = CGRect(x: 0.0, y: 0.0, width: 256.0, height: 256.0)
         
         DispatchQueue.main.async { [weak self] in
             self!.view.layer.addSublayer(self!.previewLayer)
@@ -233,7 +229,7 @@ class SegmentationViewController: UIViewController, AVCaptureVideoDataOutputSamp
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        segmentationView.frame = CGRect(x: 0.0, y: 325.0, width: 393.0, height: 325.0)
+        segmentationView.frame = CGRect(x: 0.0, y: 0.0, width: 256.0, height: 256.0)
 //        segmentationView.layer.borderWidth = 2.0
 //        segmentationView.layer.borderColor = UIColor.blue.cgColor
         segmentationView.contentMode = .scaleAspectFill
@@ -276,7 +272,7 @@ class SegmentationViewController: UIViewController, AVCaptureVideoDataOutputSamp
         let uniqueGrayscaleValues = extractUniqueGrayscaleValues(from: outPixelBuffer.pixelBuffer)
             print("Unique Grayscale Values: \(uniqueGrayscaleValues)")
         let ciImage = CIImage(cvPixelBuffer: outPixelBuffer.pixelBuffer)
-        self.sharedImageData?.pixelBuffer = ciImage
+//        self.sharedImageData?.pixelBuffer = ciImage
         //pass through the filter that converts grayscale image to different shades of red
         self.masker.inputImage = ciImage
         
@@ -288,7 +284,7 @@ class SegmentationViewController: UIViewController, AVCaptureVideoDataOutputSamp
 //                print("It doesn't have cgImage")
 //                return }
             DispatchQueue.main.async {
-                self.sharedImageData?.objectSegmentation = UIImage(ciImage: self.masker.outputImage!, scale: 1.0, orientation: .downMirrored)
+                self.sharedImageData?.objectSegmentation = self.masker.outputImage!
             }
         } else {
             self.masker.grayscaleValues = grayValues
@@ -524,4 +520,3 @@ struct HostedSegmentationViewController: UIViewControllerRepresentable{
     func updateUIViewController(_ uiView: SegmentationViewController, context: Context) {
     }
 }
-
