@@ -28,6 +28,22 @@ class ObjectLocation {
         self.setupLocationManager()
     }
     
+    func resizeMask(mask: [[Int]], newWidth: Int, newHeight: Int) -> [[Int]] {
+        let widthRatio = CGFloat(newWidth) / CGFloat(mask[0].count)
+        let heightRatio = CGFloat(newHeight) / CGFloat(mask.count)
+        var resizedMask = [[Int]](repeating: [Int](repeating: 0, count: newWidth), count: newHeight)
+        
+        for y in 0..<newHeight {
+            for x in 0..<newWidth {
+                let originalX = Int(CGFloat(x) / widthRatio)
+                let originalY = Int(CGFloat(y) / heightRatio)
+                resizedMask[y][x] = mask[originalY][originalX]
+            }
+        }
+        
+        return resizedMask
+    }
+    
     func createMask(from image: CIImage) -> [[Int]] {
         let context = CIContext(options: nil)
         guard let cgImage = context.createCGImage(image, from: image.extent) else { return [] }
@@ -51,7 +67,7 @@ class ObjectLocation {
         }
         
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-    //    print("width: \(width)")
+        // print("width: \(width)")
         var mask = [[Int]](repeating: [Int](repeating: 0, count: width), count: height)
         for row in 0..<height {
             for col in 0..<width {
@@ -60,29 +76,29 @@ class ObjectLocation {
                 mask[row][col] = Int(pixelValue) == 0 ? 0 : 1
             }
         }
-        return mask
+        return resizeMask(mask: mask, newWidth: 1024, newHeight: 1024)
     }
     
     private func setupLocationManager() {
         locationManager.requestWhenInUseAuthorization()
         locationManager.startUpdatingLocation()
         locationManager.startUpdatingHeading()
-        //        locationManager.delegate = cameraController
+        // locationManager.delegate = cameraController
     }
     
     private func handleLocationUpdate() {
         if let location = locationManager.location {
             self.latitude = location.coordinate.latitude
             self.longitude = location.coordinate.longitude
-//            locationStatus = "Latitude: \(latitude), Longitude: \(longitude)"
-//            print(locationStatus)
+            // locationStatus = "Latitude: \(latitude), Longitude: \(longitude)"
+            // print(locationStatus)
         }
     }
     
     private func handleHeadingUpdate() {
         if let heading = locationManager.heading {
             self.headingDegrees = heading.magneticHeading
-//            headingStatus = "Heading: \(headingDegrees) degrees"
+            // headingStatus = "Heading: \(headingDegrees) degrees"
         }
     }
     
@@ -90,21 +106,14 @@ class ObjectLocation {
         let objectSegmentation = sharedImageData.classImages[index]
         let mask = createMask(from: objectSegmentation)
         guard let depthMap = sharedImageData.depthData else { return }
-//        var distanceSum: Float = 0
-        var sumX = 0
-        var sumY = 0
-        var numPixels = 0
+        
+        var depthValues: [Float] = []
         
         CVPixelBufferLockBaseAddress(depthMap, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
         
         let width = mask[0].count
         let height = mask.count
-        
-        let depthWidth = CVPixelBufferGetWidth(depthMap)
-        let depthHeight = CVPixelBufferGetHeight(depthMap)
-        let centerX = depthWidth / 2
-        let centerY = depthHeight / 2
         
         if let baseAddress = CVPixelBufferGetBaseAddress(depthMap) {
             let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
@@ -113,41 +122,64 @@ class ObjectLocation {
             for y in 0..<height {
                 for x in 0..<width {
                     if mask[y][x] == 1 {
-                        numPixels += 1
-                        sumX += x
-                        sumY += y
-//                        let pixelOffset = (y * 4) * bytesPerRow / MemoryLayout<Float>.size + (x * 4)
-//                        let depthValue = floatBuffer[pixelOffset]
-//                        print(depthValue)
-//                        distanceSum += depthValue
+                        let pixelOffset = y * bytesPerRow / MemoryLayout<Float>.size + x
+                        let depthValue = floatBuffer[pixelOffset]
+                        depthValues.append(depthValue)
                     }
                 }
             }
-            let gravityX = floor(Double(sumX) * 4 / Double(numPixels))
-            let gravityY = floor(Double(sumY) * 4 / Double(numPixels))
-//            print("Y: \(gravityY), X: \(gravityX)")
-            let pixelOffset = Int(gravityY) * bytesPerRow / MemoryLayout<Float>.size + Int(gravityX)
-            depthValue = floatBuffer[pixelOffset]
-//            print("Gravity depth value: \(depthValue)")
-//
-//            print("centerY: \(centerY), centerX: \(centerX)")
-//            let centerPixelOffset = centerY * bytesPerRow / MemoryLayout<Float>.size + centerX
-//            let centerDepthValue = floatBuffer[centerPixelOffset]
-//            print("center depth: \(centerDepthValue)")
+            
+            // Determine bucket size
+            let bucketSize: Float = 0.01
+            
+            // Create histogram
+            var histogram = [Float: Int]()
+            for value in depthValues {
+                let bucket = round(value / bucketSize) * bucketSize
+                histogram[bucket, default: 0] += 1
+            }
+            
+            // Find histogram peak
+            var peakValue: Float = 0
+            var peakCount = 0
+            for (bucket, count) in histogram {
+                if count > peakCount {
+                    peakCount = count
+                    peakValue = bucket
+                }
+            }
+            
+            // Calculate deviation from peak
+            let deviations = depthValues.map { abs($0 - peakValue) }
+            let meanDeviation = deviations.reduce(0, +) / Float(deviations.count)
+            
+            // Exclude outliers (e.g. ±0.5σ from peak)
+            let tolerance: Float = 0.5 * meanDeviation
+            let filteredDepthValues = depthValues.filter { abs($0 - peakValue) <= tolerance }
+            
+//            print("----------------------------------------------------------------------")
+//            print("----------------------------------------------------------------------")
+//            print(depthValues.count)
+//            for i in 0..<depthValues.count {
+//                print(depthValues[i])
+//            }
+            
+            // Calculate average depth value
+            let averageDepth = filteredDepthValues.reduce(0, +) / Float(filteredDepthValues.count)
+            
+            // Set depth value
+            depthValue = averageDepth
         }
-        
-//        let meanDepth = distanceSum / Float(numPixels)
-//        print("Mean depth value: \(meanDepth), Pixels: \(numPixels)")
     }
     
     func settingLocation() {
         handleLocationUpdate()
         handleHeadingUpdate()
-//        guard let depth = self.depthValue else {
-//            print("depth: nil")
-//            return
-//        }
-//        print("depth: \(depth)")
+        //        guard let depth = self.depthValue else {
+        //            print("depth: nil")
+        //            return
+        //        }
+        //        print("depth: \(depth)")
         
         guard let latitude = self.latitude, let longitude = self.longitude else {
             print("latitude or longitude: nil")
