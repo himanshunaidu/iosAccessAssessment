@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SetupView: View {
-    let classes = ["Background", "Aeroplane", "Bicycle", "Bird", "Boat", "Bottle", "Bus", "Car", "Cat", "Chair", "Cow", "Diningtable", "Dog", "Horse", "Motorbike", "Person", "Pottedplant", "Sheep", "Sofa", "Train", "TV"]
+    let classes = ["Traffic Lights", "Poles", "Human", "Walls", "Sidewalks", "Fences"]
     @State private var selection = Set<Int>()
     
     var body: some View {
@@ -32,18 +32,18 @@ struct SetupView: View {
                             }
                         }) {
                             Text(classes[index])
-                                .foregroundColor(self.selection.contains(index) ? .blue : .white)
+                                .foregroundColor(self.selection.contains(index) ? .blue : .black)
                         }
                     }
                 }
-                .environment(\.colorScheme, .dark)
+                .environment(\.colorScheme, .light)
             }
             .padding()
             .navigationBarTitle("Setup View", displayMode: .inline)
             .navigationBarItems(trailing: NavigationLink(destination: ContentView(selection: Array(selection), classes: classes)) {
-                Text("Next").foregroundStyle(Color.white).font(.headline)
+                Text("Next").foregroundStyle(Color.black).font(.headline)
             })
-        }.environment(\.colorScheme, .dark)
+        }.environment(\.colorScheme, .light)
     }
 }
 
